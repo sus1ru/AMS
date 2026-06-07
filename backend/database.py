@@ -9,7 +9,7 @@ def get_connection():
     return conn
 
 
-def create_tables():
+def setup_db():
     conn = get_connection()
     cursor = conn.cursor()
 
