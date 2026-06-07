@@ -1,10 +1,10 @@
 import sqlite3
 
-DB_NAME = "backend/ams.db"
+from backend.config import settings
 
 
 def get_connection():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(settings.db_name)
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
