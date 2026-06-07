@@ -1,19 +1,6 @@
-from backend.auth.register import register_view
 from backend.config import settings
+from backend.core.router import url_router
 
-class UrlRouter:
-    URL_MAPPINGS = {}
-
-    @classmethod
-    def add(cls, path, method, view):
-        cls.URL_MAPPINGS[path] = (view, method)
-
-    @classmethod
-    def map_url(cls, path):
-        return cls.URL_MAPPINGS.get(path)
-
-url_router = UrlRouter()
-url_router.add('/register', 'POST', register_view)
 
 def root_view():
     return {
