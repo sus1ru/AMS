@@ -1,5 +1,7 @@
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
+from backend.database import create_tables
+
 class RequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -9,6 +11,7 @@ class RequestHandler(BaseHTTPRequestHandler):
 
 
 def runserver(server_class=HTTPServer, handler_class=RequestHandler):
+    create_tables()
     server_address = ('', 8500)
     httpd = server_class(server_address, handler_class)
     print("Server running on http://localhost:8500")
