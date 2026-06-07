@@ -58,7 +58,7 @@ def create_tables():
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 
-            FOREIGN KEY (artist_id) REFERENCES artist(id)
+            FOREIGN KEY (artist_id) REFERENCES artists(id)
                 ON DELETE CASCADE
         )
     """)
