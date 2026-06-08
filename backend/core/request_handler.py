@@ -1,4 +1,4 @@
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler
 import json
 
 from backend.core.exceptions import *
@@ -11,7 +11,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json")
         self.end_headers()
         self.wfile.write(json.dumps(data).encode())
-    
+
     def pre_process_request(self, path, incoming_method):
         if path not in url_router.URL_MAPPINGS:
             raise RouteDoesnotExist()
