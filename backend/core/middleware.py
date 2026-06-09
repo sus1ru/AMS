@@ -1,5 +1,5 @@
 from backend.database import get_connection
-
+from backend.config import settings
 
 def get_session_user_middleware(request):
     session_id = request.get_cookie("session_id")
@@ -35,7 +35,7 @@ def get_session_user_middleware(request):
 
 
 def session_cookie_middleware(request, response, status_code):
-    if request.path == "/login" and status_code == 200:
+    if request.path == f"{settings.api_version}/login" and status_code == 200:
         session_id = response.pop("session_id", None)
 
         if session_id:
@@ -44,7 +44,7 @@ def session_cookie_middleware(request, response, status_code):
                 f"session_id={session_id}; HttpOnly; Path=/; SameSite=Lax"
             )
 
-    if request.path == "/logout" and status_code == 200:
+    if request.path == f"{settings.api_version}/logout" and status_code == 200:
         request.set_header(
             "Set-Cookie",
             "session_id=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax"

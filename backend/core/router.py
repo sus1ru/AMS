@@ -1,8 +1,11 @@
+from backend.config import settings
+
 class UrlRouter:
     URL_MAPPINGS = {}
 
     @classmethod
     def add(cls, path, method, authenticated, view):
+        path = f'{settings.api_version}{path}'
         cls.URL_MAPPINGS[path] = (view, method, authenticated)
 
     @classmethod
