@@ -6,3 +6,6 @@ class MethodNotAllowed(Exception):
 
 class RouteDoesnotExist(Exception):
     pass
+
+class UnauthorizedException(Exception):
+    pass

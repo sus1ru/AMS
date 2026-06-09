@@ -1,7 +1,6 @@
 from backend.config import settings
 from backend.core.router import url_router
 
-
 def root_view():
     return {
         'urls': [
@@ -10,4 +9,4 @@ def root_view():
         ]
     }, 200
 
-url_router.add('/', 'GET', root_view)
+url_router.add('/', 'GET', False, root_view)
