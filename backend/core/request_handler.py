@@ -2,6 +2,7 @@ from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler
 import json
 
+from backend.config import settings
 from backend.core.exceptions import *
 from backend.core.middleware import (
     get_session_user_middleware,
@@ -11,13 +12,14 @@ from backend.urls import url_router
 
 
 class RequestHandler(BaseHTTPRequestHandler):
-    def __init__(self, request, client_address, server):
-        super().__init__(request, client_address, server)
-
     def setup_response(self):
         self.response_headers = {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Headers": "Content-Type",
         }
+        if (origin:=self.headers.get("Origin")) in settings.cors_allowed_origin:
+            self.response_headers["Access-Control-Allow-Origin"] = origin
 
     def set_header(self, key, value):
         self.response_headers[key] = value
@@ -31,30 +33,27 @@ class RequestHandler(BaseHTTPRequestHandler):
         cookies = SimpleCookie()
         cookies.load(cookie_header)
 
-
         if name not in cookies:
             return None
 
         return cookies[name].value
 
-    def send_json(self, data, status_code=200, headers=None):
-        self.send_response(status_code)
-        for key, value in self.response_headers.items():
-            self.send_header(key, value)
-
-        self.end_headers()
-        self.wfile.write(json.dumps(data).encode())
-
     def pre_process_request(self, path, incoming_method):
         self.setup_response()
 
         if path not in url_router.URL_MAPPINGS:
+            self.response_headers["Access-Control-Allow-Methods"] = "OPTIONS"
             raise RouteDoesnotExist()
 
         view, allowed_method, authenticated = url_router.map_url(self.path)
 
-        if incoming_method != allowed_method:
+        if incoming_method not in ('OPTIONS', allowed_method):
             raise MethodNotAllowed()
+
+        self.response_headers["Access-Control-Allow-Methods"] = f"{allowed_method}, OPTIONS"
+
+        if incoming_method == 'OPTIONS':
+            return view, allowed_method, authenticated
 
         self.user = None
 
@@ -66,32 +65,41 @@ class RequestHandler(BaseHTTPRequestHandler):
             else:
                 self.user = user
 
-        return view
+        return view, allowed_method, authenticated
 
-    def process_payload(self) -> dict:
-        content_length = int(self.headers.get("Content-Length", 0))
-        if content_length == 0:
-            return {}
-
-        body = self.rfile.read(content_length)
-
+    def do_OPTIONS(self):
         try:
-            payload = json.loads(body)
-        except json.JSONDecodeError as e:
-            raise InvalidPayload()
+            _, _, _ = self.pre_process_request(self.path, 'OPTIONS')
+        except RouteDoesnotExist:
+            pass
 
-        return payload
+        self.send_response(204)
+        for key, value in self.response_headers.items():
+            if key != 'Content-Type':
+                self.send_header(key, value)
+
+        self.end_headers()
+
+    def send_json(self, data, status_code=200):
+        self.send_response(status_code)
+
+        for key, value in self.response_headers.items():
+            print('send_json key value', key, value)
+            self.send_header(key, value)
+
+        self.end_headers()
+        self.wfile.write(json.dumps(data).encode())
 
     def do_GET(self) -> None:
         try:
-            view = self.pre_process_request(self.path, 'GET')
-        except MethodNotAllowed as e:
+            view, _, _ = self.pre_process_request(self.path, 'GET')
+        except MethodNotAllowed:
             self.send_json({"error": "Method not allowed"}, 405)
             return
-        except RouteDoesnotExist as e:
+        except RouteDoesnotExist:
             self.send_json({"error": "Route not found"}, 404)
             return
-        except UnauthorizedException as e:
+        except UnauthorizedException:
             self.send_json({"error": "Authentication is required"}, 401)
             return
 
@@ -103,22 +111,36 @@ class RequestHandler(BaseHTTPRequestHandler):
         )
         self.send_json(response, status_code)
 
+    def process_payload(self) -> dict:
+        content_length = int(self.headers.get("Content-Length", 0))
+        if content_length == 0:
+            return {}
+
+        body = self.rfile.read(content_length)
+
+        try:
+            payload = json.loads(body)
+        except json.JSONDecodeError:
+            raise InvalidPayload()
+
+        return payload
+
     def do_POST(self) -> None:
         try:
-            view = self.pre_process_request(self.path, 'POST')
-        except MethodNotAllowed as e:
+            view, _, _ = self.pre_process_request(self.path, 'POST')
+        except MethodNotAllowed:
             self.send_json({"error": "Method not allowed"}, 405)
             return
-        except RouteDoesnotExist as e:
+        except RouteDoesnotExist:
             self.send_json({"error": "Route not found"}, 404)
             return
-        except UnauthorizedException as e:
+        except UnauthorizedException:
             self.send_json({"error": "Authentication is required"}, 401)
             return
 
         try:
             self.data = self.process_payload()
-        except InvalidPayload as e:
+        except InvalidPayload:
             self.send_json({"error": "Invalid Payload"}, 400)
             return
 
