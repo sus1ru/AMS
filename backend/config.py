@@ -30,5 +30,7 @@ class Settings:
     db_name: str = os.getenv('DB_NAME', default='backend/ams.db')
     session_ttl_hours: int = int(os.getenv('SESSION_TTL_HOURS', default='24'))
 
+    cors_allowed_origin: list = os.getenv('CORS_ALLOWED_ORIGIN', default='*').split(',')
+
 
 settings = Settings()
