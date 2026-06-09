@@ -1,13 +1,19 @@
-import secrets
 import sqlite3
 
+from backend.auth.sessions import create_session, delete_session
 from backend.auth.utils import hash_password, verify_password
+from backend.core.router import route
 from backend.database import get_connection
 
 ALLOWED_ROLES = {"super_admin", "artist_manager", "artist"}
 ALLOWED_GENDERS = {"m", "f", "o"}
 
-def user_list_view():
+@route(
+    '/users',
+    method='GET',
+    authenticated=True
+)
+def user_list_view(request):
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -41,8 +47,13 @@ def user_list_view():
 
     return {"users": users}, 200
 
-
-def user_register_view(data):
+@route(
+    '/register',
+    method='POST',
+    authenticated=False
+)
+def user_register_view(request):
+    data = request.data
     required_fields = ["first_name", "last_name", "email", "password", "role"]
 
     for field in required_fields:
@@ -87,3 +98,61 @@ def user_register_view(data):
 
     finally:
         conn.close()
+
+@route(
+    '/login',
+    method='POST',
+    authenticated=False
+)
+def user_login_view(request):
+    data = request.data
+    if not data.get("email"):
+        return {"error": "email is required"}, 400
+
+    if not data.get("password"):
+        return {"error": "password is required"}, 400
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id, email, password
+        FROM users
+        WHERE email = ?
+    """, (data["email"],))
+
+    user = cursor.fetchone()
+
+    if not user:
+        conn.close()
+        return {"error": "Invalid email or password"}, 401
+
+    user_id = user[0]
+    stored_password = user[2]
+
+    if not verify_password(data["password"], stored_password):
+        conn.close()
+        return {"error": "Invalid email or password"}, 401
+
+    session_id = create_session(user_id)
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "message": "Logged in successfully",
+        "session_id": session_id
+    }, 200
+
+
+@route(
+    '/logout',
+    method='POST',
+    authenticated=True
+)
+def user_logout_view(request):
+    user_id = request.user.get('id')
+    delete_session(user_id)
+    return {
+        "message": "Logged out successfully",
+    }, 200
