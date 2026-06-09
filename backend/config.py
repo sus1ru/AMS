@@ -22,6 +22,7 @@ load_env(BASE_DIR / '.env')
 
 class Settings:
     app_name: str = os.getenv('APP_NAME', default='AMS')
+    api_version: str = os.getenv('API_VERSION', default='/api/v1')
 
     server_host: str = os.getenv('SERVER_HOST', default='127.0.0.1')
     server_port: int = int(os.getenv('SERVER_PORT', default='8000'))
