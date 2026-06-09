@@ -63,5 +63,17 @@ def setup_db():
         )
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id VARCHAR(255) NOT NULL UNIQUE,
+            user_id INTEGER NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            expires_at DATETIME,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+                ON DELETE CASCADE
+        )
+    """)
+
     conn.commit()
     conn.close()
