@@ -3,6 +3,8 @@ import sqlite3
 from backend.auth.serializers import UserLoginSerializer, UserRegisterSerializer
 from backend.auth.sessions import create_session, delete_session
 from backend.auth.utils import hash_password, verify_password
+from backend.core.pagination import get_pagination
+from backend.core.responses import error_response, success_response
 from backend.core.router import route
 from backend.database import get_connection
 
@@ -18,6 +20,13 @@ def user_list_view(request):
     conn = get_connection()
     cursor = conn.cursor()
 
+    cursor.execute("select count(*) from users")
+
+    total = cursor.fetchone()[0]
+    pagination = get_pagination(request, total)
+    limit = pagination.pop('limit')
+    offset = pagination.pop('offset')
+
     cursor.execute("""
         SELECT
             id, first_name, last_name,
@@ -25,7 +34,8 @@ def user_list_view(request):
             gender, address, role,
             created_at, updated_at
         FROM users
-    """)
+        LIMIT ? OFFSET ?
+    """, (limit, offset))
 
     rows = cursor.fetchall()
     conn.close()
@@ -45,8 +55,11 @@ def user_list_view(request):
             "updated_at": row[10],
         } for row in rows
     ]
-
-    return {"users": users}, 200
+    return success_response(
+        message="Users fetched successfully",
+        data={"users": users},
+        pagination=pagination,
+    )
 
 @route(
     '/register',
@@ -59,7 +72,10 @@ def user_register_view(request):
     serializer = UserRegisterSerializer(request.data)
 
     if not serializer.is_valid():
-        return {"error": serializer.error_message}, 400
+        return error_response(
+            message=serializer.error_message,
+            errors=serializer.error_dict,
+        )
 
     data = serializer.validated_data
     hashed_password = hash_password(data["password"])
@@ -90,7 +106,11 @@ def user_register_view(request):
         return {"message": "User registered successfully"}, 201
 
     except sqlite3.IntegrityError:
-        return {"error": "Email already exists"}, 409
+        return error_response(
+            message="Email already exists",
+            errors={"error": "Email already exists"},
+            status_code=409
+        )
 
     finally:
         conn.close()
@@ -105,7 +125,10 @@ def user_login_view(request):
     serializer = UserLoginSerializer(request.data)
 
     if not serializer.is_valid():
-        return {"error": serializer.error_message}, 400
+        return error_response(
+            message=serializer.error_message,
+            errors={"error": serializer.error_message},
+        )
 
     data = serializer.validated_data
 
@@ -122,24 +145,32 @@ def user_login_view(request):
 
     if not user:
         conn.close()
-        return {"error": "Invalid email or password"}, 401
+        return error_response(
+            message="Invalid email or password",
+            errors={"error": "Invalid email or password"},
+            status_code=401,
+        )
 
     user_id = user[0]
     stored_password = user[2]
 
     if not verify_password(data["password"], stored_password):
         conn.close()
-        return {"error": "Invalid email or password"}, 401
+        return error_response(
+            message="Invalid password",
+            errors={"error": "Invalid password"},
+            status_code=401,
+        )
 
     session_id = create_session(user_id)
 
     conn.commit()
     conn.close()
 
-    return {
-        "message": "Logged in successfully",
-        "session_id": session_id
-    }, 200
+    return success_response(
+        message="Logged in successfully",
+        data={"session_id": session_id}
+    )
 
 
 @route(
@@ -150,6 +181,4 @@ def user_login_view(request):
 def user_logout_view(request):
     user_id = request.user.get('id')
     delete_session(user_id)
-    return {
-        "message": "Logged out successfully",
-    }, 200
+    return success_response(message="Logged out successfully",)
