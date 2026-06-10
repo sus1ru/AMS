@@ -9,3 +9,6 @@ class RouteDoesnotExist(Exception):
 
 class UnauthorizedException(Exception):
     pass
+
+class FieldValidationError(Exception):
+    pass
