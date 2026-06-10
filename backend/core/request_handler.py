@@ -1,6 +1,7 @@
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler
 import json
+from urllib.parse import parse_qs, urlparse
 
 from backend.config import settings
 from backend.core.exceptions import *
@@ -8,6 +9,7 @@ from backend.core.middleware import (
     get_session_user_middleware,
     session_cookie_middleware
 )
+from backend.core.responses import error_response
 from backend.urls import url_router
 
 
@@ -37,15 +39,24 @@ class RequestHandler(BaseHTTPRequestHandler):
             return None
 
         return cookies[name].value
+    
+    def parse_request_url(self):
+        parsed_url = urlparse(self.path)
+        self.path_only = parsed_url.path
+        self.query_params = {
+            key: value[0]
+            for key, value in parse_qs(parsed_url.query).items()
+        }
 
-    def pre_process_request(self, path, incoming_method):
+    def pre_process_request(self, incoming_method):
         self.setup_response()
+        self.parse_request_url()
 
-        if path not in url_router.URL_MAPPINGS:
+        if self.path_only not in url_router.URL_MAPPINGS:
             self.response_headers["Access-Control-Allow-Methods"] = "OPTIONS"
             raise RouteDoesnotExist()
 
-        view, allowed_method, authenticated = url_router.map_url(self.path)
+        view, allowed_method, authenticated = url_router.map_url(self.path_only)
 
         if incoming_method not in ('OPTIONS', allowed_method):
             raise MethodNotAllowed()
@@ -69,7 +80,7 @@ class RequestHandler(BaseHTTPRequestHandler):
 
     def do_OPTIONS(self):
         try:
-            _, _, _ = self.pre_process_request(self.path, 'OPTIONS')
+            _, _, _ = self.pre_process_request('OPTIONS')
         except RouteDoesnotExist:
             pass
 
@@ -84,7 +95,6 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.send_response(status_code)
 
         for key, value in self.response_headers.items():
-            print('send_json key value', key, value)
             self.send_header(key, value)
 
         self.end_headers()
@@ -92,15 +102,33 @@ class RequestHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         try:
-            view, _, _ = self.pre_process_request(self.path, 'GET')
+            view, _, _ = self.pre_process_request('GET')
         except MethodNotAllowed:
-            self.send_json({"error": "Method not allowed"}, 405)
+            self.send_json(
+                *error_response(
+                    message="Method not allowed",
+                    errors={"error": "Method not allowed"},
+                    status_code=405
+                )
+            )
             return
         except RouteDoesnotExist:
-            self.send_json({"error": "Route not found"}, 404)
+            self.send_json(
+                *error_response(
+                    message="Route not found",
+                    errors={"error": "Route not found"},
+                    status_code=404
+                )
+            )
             return
         except UnauthorizedException:
-            self.send_json({"error": "Authentication is required"}, 401)
+            self.send_json(
+                *error_response(
+                    message="Authentication is required",
+                    errors={"error": "Authentication is required"},
+                    status_code=401
+                )
+            )
             return
 
         response, status_code = view(self)
@@ -127,21 +155,44 @@ class RequestHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         try:
-            view, _, _ = self.pre_process_request(self.path, 'POST')
+            view, _, _ = self.pre_process_request('POST')
         except MethodNotAllowed:
-            self.send_json({"error": "Method not allowed"}, 405)
+            self.send_json(
+                *error_response(
+                    message="Method not allowed",
+                    errors={"error": "Method not allowed"},
+                    status_code=405
+                )
+            )
             return
         except RouteDoesnotExist:
-            self.send_json({"error": "Route not found"}, 404)
+            self.send_json(
+                *error_response(
+                    message="Route not found",
+                    errors={"error": "Route not found"},
+                    status_code=404
+                )
+            )
             return
         except UnauthorizedException:
-            self.send_json({"error": "Authentication is required"}, 401)
-            return
+            self.send_json(
+                *error_response(
+                    message="Authentication is required",
+                    errors={"error": "Authentication is required"},
+                    status_code=401
+                )
+            )
 
         try:
             self.data = self.process_payload()
         except InvalidPayload:
-            self.send_json({"error": "Invalid Payload"}, 400)
+            self.send_json(
+                *error_response(
+                    message="Invalid Payload",
+                    errors={"error": "Invalid Payload"},
+                    status_code=400
+                )
+            )
             return
 
         response, status_code = view(self)
