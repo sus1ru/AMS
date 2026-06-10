@@ -1,5 +1,6 @@
 import sqlite3
 
+from backend.auth.serializers import UserLoginSerializer, UserRegisterSerializer
 from backend.auth.sessions import create_session, delete_session
 from backend.auth.utils import hash_password, verify_password
 from backend.core.router import route
@@ -54,18 +55,13 @@ def user_list_view(request):
 )
 def user_register_view(request):
     data = request.data
-    required_fields = ["first_name", "last_name", "email", "password", "role"]
 
-    for field in required_fields:
-        if not data.get(field):
-            return {"error": f"{field} is required"}, 400
+    serializer = UserRegisterSerializer(request.data)
 
-    if data["role"] not in ALLOWED_ROLES:
-        return {"error": "Invalid role"}, 400
+    if not serializer.is_valid():
+        return {"error": serializer.error_message}, 400
 
-    if data.get("gender") and data["gender"] not in ALLOWED_GENDERS:
-        return {"error": "Invalid gender"}, 400
-
+    data = serializer.validated_data
     hashed_password = hash_password(data["password"])
 
     try:
@@ -106,11 +102,12 @@ def user_register_view(request):
 )
 def user_login_view(request):
     data = request.data
-    if not data.get("email"):
-        return {"error": "email is required"}, 400
+    serializer = UserLoginSerializer(request.data)
 
-    if not data.get("password"):
-        return {"error": "password is required"}, 400
+    if not serializer.is_valid():
+        return {"error": serializer.error_message}, 400
+
+    data = serializer.validated_data
 
     conn = get_connection()
     cursor = conn.cursor()
