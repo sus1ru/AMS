@@ -6,6 +6,7 @@ from backend.core.request_handler import RequestHandler
 
 def init_server():
     import backend.auth.views
+    import backend.artists.views
     setup_db()
 
 def runserver(server_class=HTTPServer, handler_class=RequestHandler):

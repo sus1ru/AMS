@@ -19,15 +19,21 @@ class Field:
         self.custom_validation = custom_validation
 
     def validate(self, value):
-        if value is None and not self.null:
-            raise FieldValidationError("This field may not be null")
+        if value is None:
+            if self.required:
+                raise FieldValidationError("Field is required")
+
+            if self.null:
+                return value
+            else:
+                raise FieldValidationError("Field may not be null")
 
         if value == "" and not self.blank:
             raise FieldValidationError("This field may not be blank")
 
         if self.choices and value not in self.choices:
             raise FieldValidationError("Invalid choice")
-        
+
         if self.custom_validation:
             self.custom_validation(value)
 
@@ -124,4 +130,7 @@ class Serializer:
     
     @property
     def error_message(self):
-        return ', '.join(f'{k.capitalize()} {v.lower()}' for k, v in self.error_dict.items())
+        return ', '.join(
+            f'{k.capitalize()} {v.lower()}'
+            for k, v in self.error_dict.items()
+        )
