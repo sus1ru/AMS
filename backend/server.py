@@ -5,9 +5,10 @@ from backend.config import settings
 from backend.core.request_handler import RequestHandler
 
 def init_server():
+    setup_db()
     import backend.auth.views
     import backend.artists.views
-    setup_db()
+    import backend.songs.views
 
 def runserver(server_class=HTTPServer, handler_class=RequestHandler):
     init_server()

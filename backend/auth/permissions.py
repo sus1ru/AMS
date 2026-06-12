@@ -11,9 +11,12 @@ USER_WRITE_ROLES = {SUPER_ADMIN}
 ARTIST_READ_ROLES = {SUPER_ADMIN, ARTIST_MANAGER}
 ARTIST_WRITE_ROLES = {ARTIST_MANAGER}
 
+SONG_READ_ROLES = {SUPER_ADMIN, ARTIST_MANAGER, ARTIST}
+SONG_WRITE_ROLES = {ARTIST}
+
+
 def has_role(user, allowed_roles):
     return user and user.get("role") in allowed_roles
-
 
 def require_roles(request, allowed_roles):
     if not has_role(request.user, allowed_roles):
