@@ -69,6 +69,17 @@ def user_list_view(request):
     )
 
 @route(
+    '/me',
+    method='GET',
+    authenticated=True,
+)
+def current_user_view(request):
+    return success_response(
+        message="Current user fetched successfully",
+        data={"user": request.user},
+    )
+
+@route(
     '/register',
     method='POST',
     authenticated=False
