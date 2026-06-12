@@ -115,6 +115,9 @@ class Serializer:
         self.error_dict = {}
 
         for name, field in self.fields.items():
+            if name not in self.initial_data:
+                continue
+
             value = self.initial_data.get(name)
 
             if field.required and value in (None, ""):
