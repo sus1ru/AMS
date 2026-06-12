@@ -12,6 +12,7 @@ def first_release_year_not_in_future(value):
 
 class ArtistCreateSerializer(Serializer):
     fields = {
+        "user_id": IntegerField(required=False, null=True),
         "name": CharField(max_length=255),
         "dob": DateTimeField(
             required=False,
