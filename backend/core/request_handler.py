@@ -56,7 +56,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             self.response_headers["Access-Control-Allow-Methods"] = "OPTIONS"
             raise RouteDoesnotExist()
 
-        view, allowed_method, authenticated = url_router.map_url(self.path_only)
+        view, allowed_method, authenticated, roles = url_router.map_url(self.path_only)
 
         if incoming_method not in ('OPTIONS', allowed_method):
             raise MethodNotAllowed()
@@ -74,6 +74,9 @@ class RequestHandler(BaseHTTPRequestHandler):
             if not user:
                 raise UnauthorizedException()
             else:
+                if roles is not None and user.get("role") not in roles:
+                    raise PermissionDeniedException()
+
                 self.user = user
 
         return view, allowed_method, authenticated
@@ -130,6 +133,15 @@ class RequestHandler(BaseHTTPRequestHandler):
                 )
             )
             return
+        except PermissionDeniedException:
+            self.send_json(
+                *error_response(
+                    message="Permission denied",
+                    errors={"error": "Permission denied"},
+                    status_code=403,
+                )
+            )
+            return
 
         response, status_code = view(self)
         response, status_code = session_cookie_middleware(
@@ -182,6 +194,16 @@ class RequestHandler(BaseHTTPRequestHandler):
                     status_code=401
                 )
             )
+            return
+        except PermissionDeniedException:
+            self.send_json(
+                *error_response(
+                    message="Permission denied",
+                    errors={"error": "Permission denied"},
+                    status_code=403,
+                )
+            )
+            return
 
         try:
             self.data = self.process_payload()

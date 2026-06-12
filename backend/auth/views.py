@@ -1,5 +1,6 @@
 import sqlite3
 
+from backend.auth.permissions import SUPER_ADMIN
 from backend.auth.serializers import UserLoginSerializer, UserRegisterSerializer
 from backend.auth.sessions import create_session, delete_session
 from backend.auth.utils import hash_password, verify_password
@@ -14,7 +15,8 @@ ALLOWED_GENDERS = {"m", "f", "o"}
 @route(
     '/users',
     method='GET',
-    authenticated=True
+    authenticated=True,
+    roles={SUPER_ADMIN},
 )
 def user_list_view(request):
     conn = get_connection()
@@ -31,7 +33,12 @@ def user_list_view(request):
         SELECT
             id, first_name, last_name,
             email, phone, dob,
-            gender, address, role,
+            CASE
+                WHEN gender = 'm' THEN 'Male'
+                WHEN gender = 'f' THEN 'Female'
+                ELSE 'Others'
+            END AS gender,
+            address, role,
             created_at, updated_at
         FROM users
         LIMIT ? OFFSET ?
@@ -59,6 +66,17 @@ def user_list_view(request):
         message="Users fetched successfully",
         data={"users": users},
         pagination=pagination,
+    )
+
+@route(
+    '/me',
+    method='GET',
+    authenticated=True,
+)
+def current_user_view(request):
+    return success_response(
+        message="Current user fetched successfully",
+        data={"user": request.user},
     )
 
 @route(

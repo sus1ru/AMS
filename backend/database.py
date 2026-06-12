@@ -11,7 +11,6 @@ def get_connection():
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
-
 def setup_db():
     conn = get_connection()
     cursor = conn.cursor()
@@ -27,9 +26,7 @@ def setup_db():
             dob DATETIME,
             gender TEXT CHECK (gender IN ({genders})),
             address VARCHAR(255),
-            role TEXT NOT NULL CHECK (
-                role IN ({roles})
-            ),
+            role TEXT NOT NULL CHECK (role IN ({roles})),
             created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now')),
             updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now'))
         )
@@ -38,14 +35,19 @@ def setup_db():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS artists (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name VARCHAR(255) NOT NULL,
+            user_id INTEGER UNIQUE,
+            name VARCHAR(255) NOT NULL UNIQUE,
             dob DATETIME,
             gender TEXT CHECK (gender IN ({genders})),
             address VARCHAR(255),
             first_release_year INTEGER,
             no_of_albums_released INTEGER DEFAULT 0,
             created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now')),
-            updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now'))
+            updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now')),
+
+            FOREIGN KEY (user_id) REFERENCES users(id)
+            ON DELETE SET NULL
+
         )
     """.format(genders=str(ALLOWED_GENDERS)[1:-1]))
 
@@ -55,9 +57,7 @@ def setup_db():
             artist_id INTEGER NOT NULL,
             title VARCHAR(255) NOT NULL,
             album_name VARCHAR(255),
-            genre TEXT CHECK (
-                genre IN ({genres})
-            ),
+            genre TEXT CHECK (genre IN ({genres})),
             created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now')),
             updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now')),
 

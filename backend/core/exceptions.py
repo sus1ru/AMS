@@ -12,3 +12,6 @@ class UnauthorizedException(Exception):
 
 class FieldValidationError(Exception):
     pass
+
+class PermissionDeniedException(Exception):
+    pass

@@ -13,4 +13,10 @@ def root_view(request):
         }
     )
 
-url_router.add('/', 'GET', False, root_view)
+url_router.add(
+    '/',
+    method='GET',
+    authenticated=False,
+    view=root_view,
+    roles=None,
+)
