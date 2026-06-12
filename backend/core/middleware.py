@@ -12,9 +12,11 @@ def get_session_user_middleware(request):
     cursor.execute("""
         SELECT
             users.id, users.first_name, users.last_name,
-            users.email, users.role
+            users.email, users.role,
+            artists.id, artists.name
         FROM sessions
         JOIN users ON users.id = sessions.user_id
+        LEFT JOIN artists ON artists.user_id = users.id
         WHERE sessions.session_id = ?
           AND sessions.expires_at > datetime('now')
     """, (session_id,))
@@ -31,12 +33,16 @@ def get_session_user_middleware(request):
         "last_name": row[2],
         "email": row[3],
         "role": row[4],
+        "artist_id": row[5],
+        "artist_name": row[6],
     }
 
 
 def session_cookie_middleware(request, response, status_code):
     if request.path == f"{settings.api_version}/login" and status_code == 200:
-        session_id = response.pop("session_id", None)
+        session_id = response.get("session_id")
+        if not session_id:
+            session_id = response.get("data", {}).get("session_id")
 
         if session_id:
             request.set_header(
