@@ -23,13 +23,19 @@ class Field:
             if self.required:
                 raise FieldValidationError("Field is required")
 
-            if self.null:
-                return value
-            else:
+            if not self.null:
                 raise FieldValidationError("Field may not be null")
 
-        if value == "" and not self.blank:
-            raise FieldValidationError("This field may not be blank")
+            return value
+
+        if value == "":
+            if self.required:
+                raise FieldValidationError("Field is required")
+
+            if not self.blank:
+                raise FieldValidationError("This field may not be blank")
+
+            return value
 
         if self.choices and value not in self.choices:
             raise FieldValidationError("Invalid choice")
