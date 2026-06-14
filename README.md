@@ -2,6 +2,14 @@
 
 AMS is a small full-stack Artist Management System built for an advanced RBAC interview task. The project intentionally avoids a large backend framework so the request lifecycle, routing, validation, sessions, permissions, and SQL behavior are visible in the code.
 
+## Live Demo
+
+The app is deployed at:
+
+```txt
+https://ams.koiralasushil.com.np/
+```
+
 ## Tech Stack
 
 - Backend: Python 3.12, standard-library `http.server`, SQLite
@@ -42,7 +50,7 @@ Routing is handled through the `@route(...)` decorator in `backend/core/router.p
 - whether authentication is required
 - allowed roles
 
-The request lifecycle is centralized in `backend/core/request_handler.py`. It parses the request, resolves sessions, checks route permissions, handles JSON responses, and maps errors such as unauthorized or permission denied into consistent API responses.
+The request lifecycle is centralized in `backend/core/request_handler.py`. It parses the request, resolves sessions, checks route permissions, handles JSON responses, supports multipart CSV uploads, supports file download responses, and maps errors such as unauthorized or permission denied into consistent API responses.
 
 Authentication is session-cookie based. Login creates a session row in SQLite and returns/sets a `session_id` cookie. Authenticated requests resolve the user through middleware in `backend/core/middleware.py`.
 
@@ -102,6 +110,8 @@ GET  /api/v1/artists/available-users
 POST /api/v1/artists/create
 POST /api/v1/artists/update
 POST /api/v1/artists/delete
+POST /api/v1/artists/import
+GET  /api/v1/artists/export
 
 GET  /api/v1/songs
 GET  /api/v1/songs/available-artists
@@ -109,6 +119,55 @@ POST /api/v1/songs/create
 POST /api/v1/songs/update
 POST /api/v1/songs/delete
 ```
+
+List endpoints support pagination through query parameters:
+
+```txt
+GET /api/v1/users?page=1&limit=10
+GET /api/v1/artists?page=1&limit=10
+GET /api/v1/songs?page=1&limit=10
+```
+
+Paginated responses include a `pagination` object with `total`, `next`, and `previous`.
+
+## Bulk Artist CSV Operations
+
+Artist managers can import and export artist data as CSV.
+
+### Import
+
+```txt
+POST /api/v1/artists/import
+Content-Type: multipart/form-data
+```
+
+The request must include a file field named `file`.
+
+Expected CSV columns:
+
+```csv
+user_id,name,dob,gender,address,first_release_year,no_of_albums_released
+```
+
+`user_id` may be blank when importing artists without linking them to existing artist-role users.
+
+Import responses include row counts:
+
+```json
+{
+  "total": 50,
+  "success": 48,
+  "error": 2
+}
+```
+
+### Export
+
+```txt
+GET /api/v1/artists/export
+```
+
+The backend returns a downloadable `text/csv` response with a timestamped filename.
 
 ## Frontend Decisions
 
@@ -132,6 +191,8 @@ Important frontend behavior:
 - Artist manager can access Artists and Songs.
 - Artist can access Songs only.
 - Artist creation uses `/artists/available-users` as a typeahead dropdown for linking an artist user.
+- Artist managers can import artists from CSV and export existing artists to CSV.
+- Users and artists tables use backend pagination controls.
 - Song listing is role-aware:
   - admin/manager users see all songs grouped by artist
   - artist users see only their own songs
