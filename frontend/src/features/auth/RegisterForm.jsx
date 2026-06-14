@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { ActionButton } from '../../components/ui/ActionButton'
 import { SelectInput, TextInput } from '../../components/ui/Inputs'
-import { genders, roles } from '../../constants/options'
+import { genders } from '../../constants/options'
 import { cleanPayload } from '../../utils/form'
 import { registerUser, selectAuth } from './authSlice'
 
@@ -75,14 +75,6 @@ export function RegisterForm({ onSwitch }) {
           type="password"
           value={form.password}
         />
-
-        <SelectInput label="Role" name="role" onChange={handleChange} value={form.role}>
-          {roles.map((role) => (
-            <option key={role} value={role}>
-              {role}
-            </option>
-          ))}
-        </SelectInput>
 
         <TextInput
           label="Phone"
