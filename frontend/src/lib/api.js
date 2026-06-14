@@ -4,9 +4,6 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
   withCredentials: true,
 })
 
@@ -61,6 +58,13 @@ export const artistsApi = {
   create: (payload) => api.post('/artists/create', payload),
   update: (payload) => api.post('/artists/update', payload),
   remove: (id) => api.post('/artists/delete', { id }),
+  importCsv: (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    return api.post('/artists/import', formData)
+  },
+  exportCsv: () => api.get('/artists/export', { responseType: 'blob' }),
 }
 
 export const songsApi = {
