@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ActionButton } from '../../components/ui/ActionButton'
 import { DataTable } from '../../components/ui/DataTable'
 import { SelectInput, TextInput } from '../../components/ui/Inputs'
@@ -185,7 +185,10 @@ function ArtistForm({ availableUsers, form, loading, onCancel, onChange, onSearc
 
 export function ArtistsPanel({ onError, onViewSongs, userRole }) {
   const canWriteArtists = userRole === 'artist_manager'
+  const importInputRef = useRef(null)
   const [artists, setArtists] = useState([])
+  const [page, setPage] = useState(1)
+  const [pagination, setPagination] = useState({ total: 0 })
   const [availableUsers, setAvailableUsers] = useState([])
   const [createForm, setCreateForm] = useState(artistInitialState)
   const [editForm, setEditForm] = useState(null)
@@ -224,11 +227,13 @@ export function ArtistsPanel({ onError, onViewSongs, userRole }) {
     })
   }
 
-  async function loadArtists() {
+  async function loadArtists(nextPage = page) {
     setLoading(true)
     try {
-      const response = await artistsApi.list({ page: 1, limit: 10 })
+      const response = await artistsApi.list({ page: nextPage, limit: 10 })
       setArtists(response.data?.artists ?? response.data?.users ?? [])
+      setPagination(response.pagination ?? { total: 0 })
+      setPage(nextPage)
     } catch (error) {
       onError(error.message)
     } finally {
@@ -261,7 +266,7 @@ export function ArtistsPanel({ onError, onViewSongs, userRole }) {
       })
       setCreateForm(artistInitialState)
       setIsCreateOpen(false)
-      await loadArtists()
+      await loadArtists(1)
     } catch (error) {
       onError(error.message)
       setLoading(false)
@@ -283,7 +288,7 @@ export function ArtistsPanel({ onError, onViewSongs, userRole }) {
         no_of_albums_released: toIntegerOrNull(editForm.no_of_albums_released),
       })
       setEditForm(null)
-      await loadArtists()
+      await loadArtists(page)
     } catch (error) {
       onError(error.message)
       setLoading(false)
@@ -297,16 +302,54 @@ export function ArtistsPanel({ onError, onViewSongs, userRole }) {
       if (editForm?.id === String(artistId)) {
         setEditForm(null)
       }
-      await loadArtists()
+      await loadArtists(page)
     } catch (error) {
       onError(error.message)
       setLoading(false)
     }
   }
 
+  async function handleImport(event) {
+    const file = event.target.files?.[0]
+
+    if (!file) {
+      return
+    }
+
+    setLoading(true)
+    try {
+      await artistsApi.importCsv(file)
+      event.target.value = ''
+      await loadArtists(1)
+    } catch (error) {
+      onError(error.message)
+      setLoading(false)
+    }
+  }
+
+  async function handleExport() {
+    setLoading(true)
+    try {
+      const csvBlob = await artistsApi.exportCsv()
+      const downloadUrl = window.URL.createObjectURL(csvBlob)
+      const link = document.createElement('a')
+
+      link.href = downloadUrl
+      link.download = `artists-${new Date().toISOString()}.csv`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(downloadUrl)
+    } catch (error) {
+      onError(error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadArtists()
+    loadArtists(1)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -324,18 +367,37 @@ export function ArtistsPanel({ onError, onViewSongs, userRole }) {
         <h2 className="text-lg font-semibold">Artists</h2>
         <div className="flex gap-2">
           {canWriteArtists && (
-            <ActionButton
-              disabled={loading}
-              onClick={() => {
-                setCreateForm(artistInitialState)
-                setIsCreateOpen(true)
-                loadAvailableUsers()
-              }}
-            >
-              Create artist
-            </ActionButton>
+            <>
+              <input
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={handleImport}
+                ref={importInputRef}
+                type="file"
+              />
+              <ActionButton
+                disabled={loading}
+                onClick={() => {
+                  setCreateForm(artistInitialState)
+                  setIsCreateOpen(true)
+                  loadAvailableUsers()
+                }}
+              >
+                Create artist
+              </ActionButton>
+              <ActionButton
+                disabled={loading}
+                onClick={() => importInputRef.current?.click()}
+                tone="gray"
+              >
+                Import CSV
+              </ActionButton>
+              <ActionButton disabled={loading} onClick={handleExport} tone="gray">
+                Export CSV
+              </ActionButton>
+            </>
           )}
-          <ActionButton disabled={loading} onClick={loadArtists} tone="gray">
+          <ActionButton disabled={loading} onClick={() => loadArtists(page)} tone="gray">
             Refresh
           </ActionButton>
         </div>
@@ -445,6 +507,12 @@ export function ArtistsPanel({ onError, onViewSongs, userRole }) {
           },
         ]}
         emptyLabel={loading ? 'Loading...' : 'No artists found'}
+        pagination={{
+          limit: 10,
+          onPageChange: loadArtists,
+          page,
+          total: pagination.total ?? 0,
+        }}
         rows={artists}
       />
     </section>
