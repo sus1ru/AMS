@@ -1,0 +1,62 @@
+  services:
+    backend:
+      build:
+        context: ./backend
+        dockerfile: Dockerfile
+      restart: always
+      volumes:
+        - .:/code
+      env_file: ./backend/.env
+      command: sh -c "python3 -m backend.server"
+      healthcheck:
+        test: [
+          "CMD", "python3", "-c",
+          "import urllib.request as req; req.urlopen('http://127.0.0.1:8000/api/v1/', timeout=3)"
+        ]
+        interval: 30s
+        timeout: 5s
+        retries: 3
+        start_period: 10s
+      networks:
+        - ams
+
+    frontend:
+      build:
+        context: ./frontend
+        dockerfile: Dockerfile
+      # restart: always
+      volumes:
+        - ./frontend:/app
+        - /app/node_modules
+      env_file: ./frontend/.env
+      depends_on:
+        - backend
+      networks:
+        - ams
+
+    nginx:
+      image: nginx:alpine
+      restart: always
+      ports:
+        - 8000:80
+      volumes:
+        - ./nginx/conf.d:/etc/nginx/conf.d
+        - ./frontend/dist:/usr/share/nginx/html
+      depends_on:
+        backend:
+          condition: service_healthy
+        frontend:
+          condition: service_completed_successfully
+      healthcheck:
+        test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/ || exit 1"]
+        interval: 30s
+        timeout: 5s
+        retries: 3
+        start_period: 10s
+      networks:
+        - ams
+
+  networks:
+    ams:
+      name: ams
+      driver: bridge

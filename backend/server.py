@@ -1,17 +1,20 @@
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import HTTPServer
 
-class RequestHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header("Content-Type", "text/plain")
-        self.end_headers()
-        self.wfile.write(b"Hello from python HTTP server")
+from backend.database import setup_db
+from backend.config import settings
+from backend.core.request_handler import RequestHandler
 
+def init_server():
+    setup_db()
+    import backend.auth.views
+    import backend.artists.views
+    import backend.songs.views
 
 def runserver(server_class=HTTPServer, handler_class=RequestHandler):
-    server_address = ('', 8500)
+    init_server()
+    server_address = (settings.server_host, settings.server_port)
     httpd = server_class(server_address, handler_class)
-    print("Server running on http://localhost:8500")
+    print(f"Server running on http://{settings.server_host}:{settings.server_port}")
     httpd.serve_forever()
 
 
