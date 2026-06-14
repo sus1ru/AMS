@@ -5,10 +5,12 @@ from backend.core.exceptions import FieldValidationError
 from backend.core.serializers import CharField, DateTimeField, IntegerField, Serializer
 from backend.database import ALLOWED_GENDERS
 
-def first_release_year_not_in_future(value):
+def valid_year(value):
     today = datetime.now(UTC).year
     if value > today:
         raise FieldValidationError("Field cannot be in the future")
+    elif value < 0:
+        raise FieldValidationError("Field cannot be negative")
 
 class ArtistCreateSerializer(Serializer):
     fields = {
@@ -31,7 +33,7 @@ class ArtistCreateSerializer(Serializer):
         "first_release_year": IntegerField(
             required=False,
             null=True,
-            custom_validation=first_release_year_not_in_future,
+            custom_validation=valid_year,
         ),
         "no_of_albums_released": IntegerField(required=False, null=True),
     }

@@ -12,6 +12,9 @@ from backend.core.middleware import (
 from backend.core.responses import error_response
 from backend.urls import url_router
 
+from email.parser import BytesParser
+from email.policy import default
+
 
 class RequestHandler(BaseHTTPRequestHandler):
     def setup_response(self):
@@ -103,6 +106,23 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(json.dumps(data).encode())
 
+    def send_file(self, content, filename, content_type="text/csv", status_code=200):
+        self.send_response(status_code)
+
+        for key, value in self.response_headers.items():
+            if key != "Content-Type":
+                self.send_header(key, value)
+
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+
+        self.end_headers()
+
+        if isinstance(content, str):
+            content = content.encode("utf-8")
+
+        self.wfile.write(content)
+
     def do_GET(self) -> None:
         try:
             view, _, _ = self.pre_process_request('GET')
@@ -144,6 +164,15 @@ class RequestHandler(BaseHTTPRequestHandler):
             return
 
         response, status_code = view(self)
+        if isinstance(response, dict) and response.get("_type") == "file":
+            self.send_file(
+                response["content"],
+                response["filename"],
+                response.get("content_type", "text/csv"),
+                status_code,
+            )
+            return
+
         response, status_code = session_cookie_middleware(
             self,
             response,
@@ -151,19 +180,58 @@ class RequestHandler(BaseHTTPRequestHandler):
         )
         self.send_json(response, status_code)
 
+    def parse_multipart(self, body: bytes) -> dict:
+        content_type = self.headers.get("Content-Type")
+
+        raw_message = (
+            f"Content-Type: {content_type}\r\n"
+            "MIME-Version: 1.0\r\n"
+            "\r\n"
+        ).encode("utf-8") + body
+
+        message = BytesParser(policy=default).parsebytes(raw_message)
+
+        data = {}
+
+        for part in message.iter_parts():
+            name = part.get_param("name", header="content-disposition")
+            filename = part.get_filename()
+
+            if not name:
+                continue
+
+            payload = part.get_payload(decode=True)
+
+            if filename:
+                data[name] = {
+                    "filename": filename,
+                    "content_type": part.get_content_type(),
+                    "content": payload,
+                }
+            else:
+                data[name] = payload.decode("utf-8")
+
+        return data
+
     def process_payload(self) -> dict:
         content_length = int(self.headers.get("Content-Length", 0))
+
         if content_length == 0:
             return {}
 
         body = self.rfile.read(content_length)
+        content_type = self.headers.get("Content-Type", "")
 
-        try:
-            payload = json.loads(body)
-        except json.JSONDecodeError:
-            raise InvalidPayload()
+        if content_type.startswith("application/json"):
+            try:
+                return json.loads(body)
+            except json.JSONDecodeError:
+                raise InvalidPayload()
 
-        return payload
+        if content_type.startswith("multipart/form-data"):
+            return self.parse_multipart(body)
+
+        raise InvalidPayload()
 
     def do_POST(self) -> None:
         try:

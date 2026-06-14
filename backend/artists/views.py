@@ -1,3 +1,7 @@
+import csv
+from datetime import datetime
+import io
+
 from backend.artists.serializers import ArtistCreateSerializer, ArtistUpdateSerializer
 from backend.auth.permissions import ARTIST_MANAGER, SUPER_ADMIN
 from backend.core.pagination import get_pagination
@@ -287,3 +291,148 @@ def artist_delete_view(request):
     conn.close()
 
     return success_response(message="Artist deleted successfully")
+
+@route(
+    "/artists/import",
+    method="POST",
+    authenticated=True,
+    roles={ARTIST_MANAGER},
+)
+def artist_import_view(request):
+    print('request.data', request.data)
+    csv_file = request.data.get("file")
+
+    if not csv_file:
+        return error_response(
+            message="CSV file is required",
+            errors={"file": "CSV file is required"},
+            status_code=400,
+        )
+
+    csv_bytes = csv_file["content"]
+    csv_text = csv_bytes.decode("utf-8")
+    reader = csv.DictReader(io.StringIO(csv_text))
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    artists = []
+    error_count = 0
+
+    for row in reader:
+        user_id = row.get("user_id", "").strip() or None
+        first_year = row.get("first_release_year", "").strip() or None
+        no_of_albums = row.get("no_of_albums_released", "0").strip()
+
+        artist_data = {
+            "user_id": user_id and int(user_id),    
+            "name": row["name"],
+            "dob": row["dob"],
+            "gender": row["gender"],
+            "address": row["address"],
+            "first_release_year": first_year and int(first_year),
+            "no_of_albums_released": no_of_albums and int(no_of_albums),
+        }
+        serializer = ArtistCreateSerializer(data=artist_data)
+
+        if not serializer.is_valid():
+            error_count = error_count + 1
+            print(serializer.error_message)
+            continue
+
+        artists.append(tuple(artist_data.values()))
+
+    cursor.executemany(
+        """
+            INSERT INTO artists
+            (
+                user_id, name,
+                dob, gender,
+                address, first_release_year,
+                no_of_albums_released
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        artists
+    )
+
+    conn.commit()
+    conn.close()
+
+    return success_response(
+        message='File recieved successfully',
+        data={
+            'total': len(artists) + error_count,
+            'success': len(artists),
+            'error': error_count,
+        },
+        status_code=200,
+    )
+
+@route(
+    "/artists/export",
+    method="GET",
+    authenticated=True,
+    roles={ARTIST_MANAGER},
+)
+def artist_export_view(request):
+    is_sample = request.query_params.get('sample') in ['true', 'True']
+    if is_sample:
+        rows = [{
+            "id": 101,
+            "user_id": 201,
+            "name": "DaBaby",
+            "dob": '1993-02-03',
+            "gender": 'Male',
+            "address": 'm',
+            "first_release_year": 2012,
+            "no_of_albums_released": 4,
+        }]
+    else:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT
+                id, user_id, name,
+                dob, gender, address,
+                first_release_year,
+                no_of_albums_released
+            FROM artists
+        """)
+
+        rows = cursor.fetchall()
+        conn.close()
+
+    output = io.StringIO()
+
+    fieldnames = [
+        "id", "user_id", "name",
+        "dob", "gender", "address",
+        "first_release_year",
+        "no_of_albums_released",
+    ]
+
+    writer = csv.DictWriter(output, fieldnames=fieldnames)
+    writer.writeheader()
+
+    for row in rows:
+        writer.writerow({
+            "id": row[0],
+            "user_id": row[1] or "",
+            "name": row[2],
+            "dob": row[3] or "",
+            "gender": row[4] or "",
+            "address": row[5] or "",
+            "first_release_year": row[6] or "",
+            "no_of_albums_released": row[7] or 0,
+        })
+
+    filename = f'artists-{datetime.now().isoformat()}.csv'
+
+    return {
+        "_type": "file",
+        "filename": filename,
+        "content_type": "text/csv",
+        "content": output.getvalue(),
+    }, 200
