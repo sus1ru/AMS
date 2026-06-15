@@ -36,6 +36,8 @@ AMS/
 │   └── src/utils/         # frontend helpers
 ├── nginx/conf.d/          # Nginx reverse proxy config
 ├── scripts/               # helper scripts
+├── artists.csv            # small CSV import sample
+├── sample_artists.csv     # larger CSV import sample
 └── docker-compose.yml
 ```
 
@@ -169,6 +171,13 @@ GET /api/v1/artists/export
 
 The backend returns a downloadable `text/csv` response with a timestamped filename.
 
+Sample CSV files are available in the repository root:
+
+```txt
+artists.csv
+sample_artists.csv
+```
+
 ## Frontend Decisions
 
 The frontend is split by feature rather than keeping all code in `App.jsx`. This keeps the RBAC UI easier to reason about:
@@ -179,7 +188,7 @@ The frontend is split by feature rather than keeping all code in `App.jsx`. This
 - `songs`: role-aware song listing and artist-owned song CRUD
 - `dashboard`: tab visibility based on current user role
 
-Axios is centralized in `frontend/src/lib/api.js`. It sets the API base URL, enables cookies with `withCredentials: true`, and normalizes backend error responses into frontend-friendly messages.
+Axios is centralized in `frontend/src/lib/api.js`. It sets the API base URL, enables cookies with `withCredentials: true`, and normalizes backend error responses into frontend-friendly messages. The client does not force a global JSON content type, which lets browser `FormData` requests generate the correct multipart boundary for CSV uploads.
 
 Redux Toolkit is used for authentication state because the current user affects the entire app: available tabs, protected actions, and artist ownership behavior.
 
@@ -191,8 +200,8 @@ Important frontend behavior:
 - Artist manager can access Artists and Songs.
 - Artist can access Songs only.
 - Artist creation uses `/artists/available-users` as a typeahead dropdown for linking an artist user.
-- Artist managers can import artists from CSV and export existing artists to CSV.
-- Users and artists tables use backend pagination controls.
+- Artist managers can import artists from CSV through a file picker and export existing artists as a downloaded CSV.
+- Users and artists tables use backend pagination controls with previous/next navigation.
 - Song listing is role-aware:
   - admin/manager users see all songs grouped by artist
   - artist users see only their own songs
@@ -264,6 +273,28 @@ and the backend healthcheck should call:
 
 ```txt
 http://127.0.0.1:8000/api/v1/
+```
+
+## Production Deployment
+
+Production is served at:
+
+```txt
+https://ams.koiralasushil.com.np/
+```
+
+The GitHub Actions workflow in `.github/workflows/deploy.yml` deploys pushes to `main`. It connects to the server through Tailscale, pulls the latest `main`, rebuilds the Docker Compose stack, removes orphaned containers, and prunes unused Docker images.
+
+Required deployment secrets:
+
+```txt
+TS_OAUTH_CLIENT_ID
+TS_OAUTH_SECRET
+DEPLOY_HOST
+DEPLOY_USER
+DEPLOY_SSH_KEY
+DEPLOY_PORT
+DEPLOY_PATH
 ```
 
 ## Running Locally Without Docker
